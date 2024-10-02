@@ -1,6 +1,7 @@
 import re
 import math
 
+
 def parse_coeff(group):
     if group is None:
         return 0
@@ -23,18 +24,6 @@ def parse_equations(file_path):
         for line in f:
             match = re.match(pattern, line.replace(" ", ""))
             if match:
-
-                def parse_coeff(group):
-                    if group is None:
-                        return 0
-                    group = group.replace("x", "").replace("y", "").replace("z", "")
-                    if group == "" or group == "+":
-                        return 1
-                    elif group == "-":
-                        return -1
-                    else:
-                        return int(group)
-
                 a = parse_coeff(match.group(1))
                 b = parse_coeff(match.group(2))
                 c = parse_coeff(match.group(3))
