@@ -1,6 +1,6 @@
-import pathlib
 import re
 import math
+
 
 def parse_coeff(group):
     if group is None:
@@ -13,40 +13,45 @@ def parse_coeff(group):
     else:
         return int(group)
 
-def load_system(path: pathlib.Path) -> tuple[list[list[float]], list[float]]:
+
+def parse_equations(file_path):
     A = []
     B = []
 
     pattern = r"([+-]?\d*x)?\s*([+-]?\d*y)?\s*([+-]?\d*z)?\s*=\s*([+-]?\d+)"
 
-    with open(path, "r") as f:
+    with open(file_path, "r") as f:
         for line in f:
             match = re.match(pattern, line.replace(" ", ""))
             if match:
                 a = parse_coeff(match.group(1))
                 b = parse_coeff(match.group(2))
                 c = parse_coeff(match.group(3))
-                d = float(match.group(4))
+                d = int(match.group(4))
 
                 A.append([a, b, c])
                 B.append(d)
 
     return A, B
 
-def determinant(matrix: list[list[float]]) -> float:
+
+def determinant(matrix):
     return (
-            matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1])
-            - matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0])
-            + matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0])
+        matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1])
+        - matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0])
+        + matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0])
     )
 
-def trace(matrix: list[list[float]]) -> float:
+
+def trace(matrix):
     return matrix[0][0] + matrix[1][1] + matrix[2][2]
 
-def norm(vector: list[float]) -> float:
+
+def vector_norm(vector):
     return math.sqrt(vector[0] ** 2 + vector[1] ** 2 + vector[2] ** 2)
 
-def transpose(matrix: list[list[float]]) -> list[list[float]]:
+
+def transpose(matrix):
     transpose_matrix = []
     first_column = []
     for i in range(3):
@@ -62,7 +67,8 @@ def transpose(matrix: list[list[float]]) -> list[list[float]]:
     transpose_matrix.append(first_column)
     return transpose_matrix
 
-def multiply(matrix: list[list[float]], vector: list[float]) -> list[float]:
+
+def multiply_matrix_vector(matrix, vector):
     dot = []
     for i in range(len(matrix)):
         sum = 0
@@ -71,12 +77,14 @@ def multiply(matrix: list[list[float]], vector: list[float]) -> list[float]:
         dot.append(sum)
     return dot
 
-def multiply_matrix_scalar(matrix: list[list[float]], scalar: float) -> list[list[float]]:
+
+def multiply_matrix_scalar(matrix, scalar):
     new_matrix = [row[:] for row in matrix]
     for i in range(len(matrix)):
         for j in range(len(matrix[i])):
             new_matrix[i][j] = matrix[i][j] * scalar
     return new_matrix
+
 
 def replace_column(matrix, vector, column_index):
     new_matrix = [row[:] for row in matrix]
@@ -84,7 +92,8 @@ def replace_column(matrix, vector, column_index):
         new_matrix[i][column_index] = vector[i]
     return new_matrix
 
-def solve_cramer(matrix: list[list[float]], vector: list[float]) -> list[float]:
+
+def cramer_rule(matrix, vector):
     det_A = determinant(matrix)
     det_Ax = determinant(replace_column(matrix, vector, 0))
     x = det_Ax / det_A
@@ -92,9 +101,10 @@ def solve_cramer(matrix: list[list[float]], vector: list[float]) -> list[float]:
     y = det_Ay / det_A
     det_Az = determinant(replace_column(matrix, vector, 2))
     z = det_Az / det_A
-    return list([x, y, z])
+    return x, y, z
 
-def minor(matrix: list[list[float]], row: int, col: int) -> list[list[float]]:
+
+def calculate_det_minor(matrix, row, col):
     new_matrix = []
     coef = (-1) ** (row + col)
     for i in range(len(matrix)):
@@ -108,38 +118,47 @@ def minor(matrix: list[list[float]], row: int, col: int) -> list[list[float]]:
     return coef * det
 
 
-def cofactor(matrix: list[list[float]]) -> list[list[float]]:
-    adjugate_matrix = list()
+def calculate_cofactor_matrix(matrix):
+    adjugate_matrix = []
     for i in range(len(matrix)):
-        line = list()
+        line = []
         for j in range(len(matrix[i])):
-            line.append(minor(matrix, i, j))
+            line.append(calculate_det_minor(matrix, i, j))
         adjugate_matrix.append(line)
     return adjugate_matrix
 
-def adjoint(matrix: list[list[float]]) -> list[list[float]]:
-    return transpose(matrix)
 
-def solve(matrix: list[list[float]], vector: list[float]) -> list[float]:
-    cofactor_matrix = cofactor(matrix)
+def inversion(matrix, B):
+    cofactor_matrix = calculate_cofactor_matrix(matrix)
     adjugate_matrix = transpose(cofactor_matrix)
     matrix_determinant = determinant(matrix)
     matrix_inversion = multiply_matrix_scalar(adjugate_matrix, 1 / matrix_determinant)
-    solution = multiply(matrix_inversion, vector)
+    solution = multiply_matrix_vector(matrix_inversion, B)
     return solution
-
-def main():
-    A, B = load_system(pathlib.Path("system.txt"))
-    print(f"{A=} {B=}")
-    print(f"{determinant(A)=}")
-    print(f"{trace(A)=}")
-    print(f"{norm(B)=}")
-    print(f"{transpose(A)=}")
-    print(f"{multiply(A, B)=}")
-    print(f"{solve_cramer(A, B)=}")
-    print(f"{solve(A, B)=}")
-
 
 
 if __name__ == "__main__":
-    main()
+    file_path = "input.txt"
+    A, B = parse_equations(file_path)
+    print("Matrix A (Coefficients):")
+    for row in A:
+        print(row)
+
+    print("\nVector B (Constants):")
+    print(B)
+
+    print(f"\nDeterminant = {determinant(A)}\n")
+    print(f"Trace = {trace(A)}\n")
+    print(f"Norm = {vector_norm(B)}\n")
+    print(f"Transpose = ")
+    transpose_matrix = transpose(A)
+    for row in transpose_matrix:
+        print(row)
+    print(f"\nMultiplication = ")
+    dot = multiply_matrix_vector(A, B)
+    for row in dot:
+        print(row)
+    print("Cramer Rule")
+    print(cramer_rule(A, B))
+    print("Adjugate Matrix")
+    print(inversion(A, B))
