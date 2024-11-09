@@ -1,8 +1,17 @@
 import random
-
 import numpy as np
-from torch.nn.functional import sigmoid
 from torchvision.datasets import MNIST
+
+
+def print_progress(bars):
+    print("| ", end="")
+    for i in range(bars):
+        print("|", end="")
+    if 100 - bars > 0:
+        for i in range(100 - bars):
+            print(" ", end="")
+        print(" |", end="")
+    print()
 
 
 def download_mnist(is_train: bool):
@@ -26,55 +35,63 @@ class NeuralNetwork:
         self.b_output = np.random.randn(output_size)
 
     def sigmoid(self, z):
-        return 1.0 / (1.0 + np.exp(z))
+        return 1.0 / (1.0 + np.exp(-z))
 
     def softmax(self, z):
-        exp_z = np.exp(z)
+        max_z = np.max(z, axis=1, keepdims=True)
+        exp_z = np.exp(z) / max_z
         return exp_z / np.sum(exp_z, axis=1, keepdims=True)
 
     def forward_hidden_layer(self, X):
         z_hidden = np.dot(X, self.w_hidden) + self.b_hidden
-        a_hidden = self.sigmoid(z_hidden)
-        return a_hidden, z_hidden
+        y_hidden = self.sigmoid(z_hidden)
+        return y_hidden, z_hidden
 
     def forward_output_layer(self, a_hidden):
         z_output = np.dot(a_hidden, self.w_output) + self.b_output
-        y_pred = self.softmax(z_output)
-        return y_pred, z_output
+        y_hidden = self.softmax(z_output)
+        return y_hidden, z_output
+
+    def sigmoid_derivative(self, z):
+        sig = self.sigmoid(z)
+        return sig * (1 - sig)
 
     def backpropagation(self, X_batch, y_true, a_hidden, z_hidden, y_pred, learning_rate):
         delta_output = y_pred - y_true
+
         gradient_W_output = np.dot(a_hidden.T, delta_output)
         gradient_b_output = np.sum(delta_output, axis=0)
 
-        delta_hidden = np.dot(delta_output, self.W_output.T)
-        delta_hidden[z_hidden <= 0] = 0  # Derivata ReLU
+        delta_hidden = np.dot(delta_output, self.w_output.T) * self.sigmoid_derivative(z_hidden)
         gradient_W_hidden = np.dot(X_batch.T, delta_hidden)
         gradient_b_hidden = np.sum(delta_hidden, axis=0)
 
-        self.W_output -= learning_rate * gradient_W_output
+        self.w_output -= learning_rate * gradient_W_output
         self.b_output -= learning_rate * gradient_b_output
-        self.W_hidden -= learning_rate * gradient_W_hidden
+        self.w_hidden -= learning_rate * gradient_W_hidden
         self.b_hidden -= learning_rate * gradient_b_hidden
 
-    def train_model(self, train_X, train_Y, epochs=50, batch_size=100, learning_rate=0.01):
+    def train_model(self, train_X, train_Y, test_X, test_Y, epochs=100, batch_size=100, learning_rate=0.01):
         for epoch in range(epochs):
             num_batches = train_X.shape[0] // batch_size
             for i in range(num_batches):
                 X_batch = train_X[i * batch_size:(i + 1) * batch_size]
                 y_batch = train_Y[i * batch_size:(i + 1) * batch_size]
-                a_hidden, z_hidden = self.forward_hidden_layer(X_batch)
-                y_pred, z_output = self.forward_output_layer(a_hidden)
-                print(y_batch.shape)
+                y_hidden, z_hidden = self.forward_hidden_layer(X_batch)
+                y_pred, z_output = self.forward_output_layer(y_hidden)
 
-                self.backpropagation(X_batch, y_batch, a_hidden, z_hidden, y_pred, learning_rate)
+                self.backpropagation(X_batch, y_batch, y_hidden, z_hidden, y_pred, learning_rate)
 
-        accuracy = self.compute_accuracy(train_X, train_Y)
-        print(f"Epoch {epoch + 1}/{epochs} - Training Accuracy: {accuracy * 100:.2f}%")
+            train_accuracy = self.compute_accuracy(train_X, train_Y)
+            val_accuracy = self.compute_accuracy(test_X, test_Y)
+            if epoch % 10 == 0 or (epoch + 1) == 100:
+                print(
+                    f"Epoch {epoch + 1}/{epochs} - Training Accuracy: {train_accuracy * 100:.2f}% - Validation Accuracy: {val_accuracy * 100:.2f}%")
+                print_progress(epoch)
 
     def compute_accuracy(self, X, y):
-        a_hidden, _ = self.forward_hidden_layer(X)
-        y_pred, _ = self.forward_output_layer(a_hidden)
+        y_hidden, _ = self.forward_hidden_layer(X)
+        y_pred, _ = self.forward_output_layer(y_hidden)
         predictions = np.argmax(y_pred, axis=1)
         true_labels = np.argmax(y, axis=1)
         accuracy = np.mean(predictions == true_labels)
@@ -88,4 +105,4 @@ train_X = train_X / 255.0
 test_X = test_X / 255.0
 train_Y_oh = one_hot_encode(train_Y, 10)
 test_Y_oh = one_hot_encode(test_Y, 10)
-rn.train_model(train_X, train_Y_oh)
+rn.train_model(train_X, train_Y_oh, test_X, test_Y_oh)
