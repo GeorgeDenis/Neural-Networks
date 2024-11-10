@@ -27,11 +27,13 @@ def one_hot_encode(y, num_classes=10):
 
 
 class NeuralNetwork:
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, output_size, learning_rate, decay_rate):
         self.w_hidden = np.random.randn(input_size, hidden_size) * 0.01
         self.b_hidden = np.random.randn(hidden_size)
         self.w_output = np.random.randn(hidden_size, output_size) * 0.01
         self.b_output = np.random.randn(output_size)
+        self.learning_rate = learning_rate
+        self.decay_rate = decay_rate
 
     def sigmoid(self, z):
         return 1.0 / (1.0 + np.exp(-z))
@@ -70,9 +72,14 @@ class NeuralNetwork:
         self.w_hidden -= learning_rate * gradient_W_hidden
         self.b_hidden -= learning_rate * gradient_b_hidden
 
-    def train_model(self, train_X, train_Y, test_X, test_Y, epochs=100, batch_size=100, learning_rate=0.01):
+    def update_learning_rate(self, epoch, initial_lr=0.01, epochs_drop=10):
+        return initial_lr * (self.decay_rate ** (epoch // epochs_drop))
+
+    def train_model(self, train_X, train_Y, test_X, test_Y, epochs=100, batch_size=100):
         for epoch in range(epochs):
             num_batches = train_X.shape[0] // batch_size
+            learning_rate = self.update_learning_rate(epoch)
+
             for i in range(num_batches):
                 X_batch = train_X[i * batch_size:(i + 1) * batch_size]
                 y_batch = train_Y[i * batch_size:(i + 1) * batch_size]
@@ -97,7 +104,7 @@ class NeuralNetwork:
         return accuracy
 
 
-rn = NeuralNetwork(784, 100, 10)
+rn = NeuralNetwork(784, 100, 10, 0.01, 0.5)
 train_X, train_Y = download_mnist(True)
 test_X, test_Y = download_mnist(False)
 train_X = train_X / 255.0

@@ -27,11 +27,12 @@ def one_hot_encode(y, num_classes=10):
 
 
 class NeuralNetwork:
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, output_size, dropout_prob):
         self.w_hidden = np.random.randn(input_size, hidden_size) * 0.01
         self.b_hidden = np.random.randn(hidden_size)
         self.w_output = np.random.randn(hidden_size, output_size) * 0.01
         self.b_output = np.random.randn(output_size)
+        self.dropout_prob = dropout_prob
 
     def sigmoid(self, z):
         return 1.0 / (1.0 + np.exp(-z))
@@ -41,9 +42,15 @@ class NeuralNetwork:
         exp_z = np.exp(z) / max_z
         return exp_z / np.sum(exp_z, axis=1, keepdims=True)
 
-    def forward_hidden_layer(self, X):
+    def apply_dropout(self, activations):
+        dropout_mask = np.random.binomial(1, 1 - self.dropout_prob, activations.shape)
+        return activations * dropout_mask / (1 - self.dropout_prob)
+
+    def forward_hidden_layer(self, X, training=True):
         z_hidden = np.dot(X, self.w_hidden) + self.b_hidden
         y_hidden = self.sigmoid(z_hidden)
+        if training:
+            z_hidden = self.apply_dropout(z_hidden)
         return y_hidden, z_hidden
 
     def forward_output_layer(self, a_hidden):
@@ -76,20 +83,20 @@ class NeuralNetwork:
             for i in range(num_batches):
                 X_batch = train_X[i * batch_size:(i + 1) * batch_size]
                 y_batch = train_Y[i * batch_size:(i + 1) * batch_size]
-                y_hidden, z_hidden = self.forward_hidden_layer(X_batch)
+                y_hidden, z_hidden = self.forward_hidden_layer(X_batch, True)
                 y_pred, z_output = self.forward_output_layer(y_hidden)
 
                 self.backpropagation(X_batch, y_batch, y_hidden, z_hidden, y_pred, learning_rate)
 
-            train_accuracy = self.compute_accuracy(train_X, train_Y)
-            val_accuracy = self.compute_accuracy(test_X, test_Y)
+            train_accuracy = self.compute_accuracy(train_X, train_Y, False)
+            val_accuracy = self.compute_accuracy(test_X, test_Y, False)
             if epoch % 10 == 0 or (epoch + 1) == 100:
                 print(
                     f"Epoch {epoch + 1}/{epochs} - Training Accuracy: {train_accuracy * 100:.2f}% - Validation Accuracy: {val_accuracy * 100:.2f}%")
                 print_progress(epoch)
 
-    def compute_accuracy(self, X, y):
-        y_hidden, _ = self.forward_hidden_layer(X)
+    def compute_accuracy(self, X, y, training=True):
+        y_hidden, _ = self.forward_hidden_layer(X, training)
         y_pred, _ = self.forward_output_layer(y_hidden)
         predictions = np.argmax(y_pred, axis=1)
         true_labels = np.argmax(y, axis=1)
@@ -97,7 +104,7 @@ class NeuralNetwork:
         return accuracy
 
 
-rn = NeuralNetwork(784, 100, 10)
+rn = NeuralNetwork(784, 100, 10, 0.5)
 train_X, train_Y = download_mnist(True)
 test_X, test_Y = download_mnist(False)
 train_X = train_X / 255.0
