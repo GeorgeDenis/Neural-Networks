@@ -117,4 +117,4 @@ def generate_submission(model, test_data):
 
 train_model(model)
 print(check_accuracy(loaders['train'], model))
-generate_submission(model, test_data)
+# generate_submission(model, test_data)
