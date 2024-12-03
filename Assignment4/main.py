@@ -8,12 +8,12 @@ from tqdm import tqdm
 from torch import device
 
 image_to_tensor = transforms.Compose([transforms.ToTensor()])
-train_data = datasets.MNIST(root='data', train=True, transform=image_to_tensor, download=True)
-test_data = datasets.MNIST(root='data', train=False, transform=image_to_tensor, download=True)
+train_data = datasets.MNIST(root='/mnist-dataset', train=True, transform=image_to_tensor, download=True)
+test_data = datasets.MNIST(root='/mnist-dataset', train=False, transform=image_to_tensor, download=True)
 
 loaders = {
-    'train': DataLoader(train_data, batch_size=128, shuffle=True),
-    'test': DataLoader(test_data, batch_size=128, shuffle=True)
+    'train': DataLoader(train_data, batch_size=64, shuffle=True),
+    'test': DataLoader(test_data, batch_size=500, shuffle=True)
 }
 
 
@@ -42,46 +42,38 @@ class MyNN(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.4),
             nn.Linear(32, 10, bias=False)
-
-
         )
 
     def forward(self, x):
         return self.layers(x)
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-model = MyNN().to(device)
-
 def train_model(model):
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
     for epoch in range(50):
         print(f"Epoch {epoch + 1}")
 
-        for phase in ['train', 'test']:
-            if phase == 'train':
-                model.train()
-            else:
-                model.eval()
+        model.train()
 
-            for batch_idx, (inputs, labels) in enumerate(tqdm(loaders[phase])):
-                inputs, labels = inputs.to(device), labels.to(device)
-                inputs = inputs.reshape(inputs.shape[0], -1)
-                optimizer.zero_grad()
+        for batch_idx, (inputs, labels) in enumerate(tqdm(loaders['train'])):
+            inputs, labels = inputs.to(device), labels.to(device)
+            inputs = inputs.reshape(inputs.shape[0], -1)
+            optimizer.zero_grad()
 
-                with torch.set_grad_enabled(phase == 'train'):
-                    outputs = model(inputs)
-                    loss = criterion(outputs, labels)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
 
-                    if phase == 'train':
-                        loss.backward()
-                        optimizer.step()
+            loss.backward()
+            optimizer.step()
         train_acc = check_accuracy(loaders['train'], model)
         test_acc = check_accuracy(loaders['test'], model)
         print(f"Train Accuracy: {train_acc * 100:.2f}% | Test Accuracy: {test_acc * 100:.2f}%")
+
+        scheduler.step()
+
 
 def check_accuracy(loader, model):
     num_correct = 0
@@ -97,6 +89,7 @@ def check_accuracy(loader, model):
             num_samples += predictions.size(0)
     model.train()
     return num_correct.item() / num_samples
+
 
 def generate_submission(model, test_data):
     model.eval()
@@ -115,6 +108,9 @@ def generate_submission(model, test_data):
     df.to_csv("submission.csv", index=False)
     print("Saved in submission.csv!")
 
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = MyNN().to(device)
 train_model(model)
 print(check_accuracy(loaders['train'], model))
-# generate_submission(model, test_data)
+generate_submission(model, test_data)
